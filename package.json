@@ -1,0 +1,14 @@
+{
+  "name": "google-photos-waste-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local fixture-only crown test: select exactly 10 photo tiles. No real Google account, no delete automation.",
+  "type": "module",
+  "scripts": {
+    "poc": "node poc/select-ten.mjs",
+    "postinstall": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Photos Fixture PoC</string>
+    <string name="hint">왕관 테스트용 가짜 그리드. 지정 후보만 선택. 삭제는 자동화하지 않음.</string>
+    <string name="selection_count_fmt">선택됨 %1$d개</string>
+    <string name="delete">삭제</string>
+</resources>

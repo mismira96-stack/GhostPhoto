@@ -1,0 +1,18 @@
+﻿# Build & Dependency
+.gradle/
+build/
+app/build/
+android-poc/build/
+android-poc/app/build/
+local.properties
+*.iml
+.idea/
+
+# Node
+node_modules/
+
+# OS / Temporary
+*.tmp
+*.log
+.DS_Store
+Thumbs.db

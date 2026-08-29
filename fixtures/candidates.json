@@ -1,0 +1,15 @@
+{
+  "goal": "select exactly these 10",
+  "candidates": [
+    { "id": "media-c01", "label": "해변 석양" },
+    { "id": "media-c02", "label": "고양이" },
+    { "id": "media-c03", "label": "산 정상" },
+    { "id": "media-c04", "label": "커피잔" },
+    { "id": "media-c05", "label": "야경" },
+    { "id": "media-c06", "label": "꽃밭" },
+    { "id": "media-c07", "label": "도서관" },
+    { "id": "media-c08", "label": "자전거" },
+    { "id": "media-c09", "label": "눈 내린 거리" },
+    { "id": "media-c10", "label": "강아지" }
+  ]
+}

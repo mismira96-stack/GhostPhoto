@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Photos 그리드 픽스처 (로컬 PoC)</title>
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --tile: #e8eaed;
+      --selected: #1a73e8;
+      --text: #202124;
+      --muted: #5f6368;
+      --danger: #d93025;
+      --bar: #fff;
+      --shadow: 0 1px 2px rgba(60, 64, 67, 0.15);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 20px;
+      background: var(--bar);
+      box-shadow: var(--shadow);
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    #selection-count {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--selected);
+    }
+    #btn-delete {
+      border: none;
+      background: var(--danger);
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      opacity: 0.55;
+    }
+    #btn-delete:disabled {
+      cursor: not-allowed;
+      opacity: 0.35;
+    }
+    .hint {
+      margin: 12px 20px 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      padding: 16px 20px 32px;
+    }
+    .tile {
+      position: relative;
+      aspect-ratio: 1;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      background: var(--tile);
+      cursor: pointer;
+      overflow: hidden;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 8px;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .tile:hover { box-shadow: var(--shadow); }
+    .tile.selected {
+      border-color: var(--selected);
+      box-shadow: 0 0 0 1px var(--selected);
+    }
+    .tile .check {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      background: rgba(0, 0, 0, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .tile.selected .check {
+      background: var(--selected);
+      border-color: var(--selected);
+    }
+    .tile .check::after { content: ""; }
+    .tile.selected .check::after { content: "✓"; }
+    .tile .label {
+      font-size: 0.75rem;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+      line-height: 1.25;
+    }
+    .tile .swatch {
+      position: absolute;
+      inset: 0;
+      opacity: 0.9;
+      z-index: 0;
+    }
+    .tile .check,
+    .tile .label { position: relative; z-index: 1; }
+    /* Distinct fake photo colors so wrong CSS selectors are obvious in a demo */
+    .c-amber { background: linear-gradient(145deg, #f6c177, #d97706); }
+    .c-rose { background: linear-gradient(145deg, #fda4af, #e11d48); }
+    .c-sky { background: linear-gradient(145deg, #7dd3fc, #0284c7); }
+    .c-lime { background: linear-gradient(145deg, #bef264, #65a30d); }
+    .c-violet { background: linear-gradient(145deg, #c4b5fd, #7c3aed); }
+    .c-slate { background: linear-gradient(145deg, #94a3b8, #334155); }
+    .c-teal { background: linear-gradient(145deg, #5eead4, #0f766e); }
+    .c-orange { background: linear-gradient(145deg, #fdba74, #ea580c); }
+    .c-indigo { background: linear-gradient(145deg, #a5b4fc, #4338ca); }
+    .c-pink { background: linear-gradient(145deg, #f9a8d4, #db2777); }
+    .c-gray { background: linear-gradient(145deg, #cbd5e1, #64748b); }
+    .c-green { background: linear-gradient(145deg, #86efac, #16a34a); }
+    .c-blue { background: linear-gradient(145deg, #93c5fd, #2563eb); }
+    .c-brown { background: linear-gradient(145deg, #d6b48a, #92400e); }
+    .c-cyan { background: linear-gradient(145deg, #67e8f9, #0891b2); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Google Photos 스타일 픽스처 (로컬 전용)</h1>
+    <div class="meta">
+      <span id="selection-count" data-testid="selection-count">선택됨 0개</span>
+      <!-- NON-functional for PoC automation: never click from scripts -->
+      <button type="button" id="btn-delete" data-testid="delete-button" disabled title="PoC에서는 자동화하지 않음">
+        삭제
+      </button>
+    </div>
+  </header>
+  <p class="hint">
+    왕관 테스트용 가짜 그리드입니다. 지정 후보만 선택하세요. 삭제 버튼은 UI만 있고 PoC 스크립트는 절대 누르지 않습니다.
+  </p>
+
+  <!--
+    Mix of candidates (media-c*) and decoys (media-d*).
+    Wrong selectors (e.g. first 10 tiles, all .tile, nth-child) must fail the crown test.
+    Order is intentionally interleaved — not candidate-first.
+  -->
+  <main class="grid" id="photos-grid" role="grid" aria-label="사진 그리드">
+    <div class="tile" role="gridcell" data-media-key="media-d01" data-kind="decoy" tabindex="0">
+      <div class="swatch c-gray"></div><span class="check" aria-hidden="true"></span><span class="label">장식용 풍경</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c01" data-kind="candidate" tabindex="0">
+      <div class="swatch c-amber"></div><span class="check" aria-hidden="true"></span><span class="label">해변 석양</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d02" data-kind="decoy" tabindex="0">
+      <div class="swatch c-slate"></div><span class="check" aria-hidden="true"></span><span class="label">회의 화이트보드</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c02" data-kind="candidate" tabindex="0">
+      <div class="swatch c-rose"></div><span class="check" aria-hidden="true"></span><span class="label">고양이</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d03" data-kind="decoy" tabindex="0">
+      <div class="swatch c-brown"></div><span class="check" aria-hidden="true"></span><span class="label">영수증 스캔</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d04" data-kind="decoy" tabindex="0">
+      <div class="swatch c-gray"></div><span class="check" aria-hidden="true"></span><span class="label">스크린샷_01</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c03" data-kind="candidate" tabindex="0">
+      <div class="swatch c-sky"></div><span class="check" aria-hidden="true"></span><span class="label">산 정상</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d05" data-kind="decoy" tabindex="0">
+      <div class="swatch c-indigo"></div><span class="check" aria-hidden="true"></span><span class="label">앱 아이콘 모음</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c04" data-kind="candidate" tabindex="0">
+      <div class="swatch c-lime"></div><span class="check" aria-hidden="true"></span><span class="label">커피잔</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d06" data-kind="decoy" tabindex="0">
+      <div class="swatch c-teal"></div><span class="check" aria-hidden="true"></span><span class="label">문서 표지</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d07" data-kind="decoy" tabindex="0">
+      <div class="swatch c-cyan"></div><span class="check" aria-hidden="true"></span><span class="label">밈_캡처</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c05" data-kind="candidate" tabindex="0">
+      <div class="swatch c-violet"></div><span class="check" aria-hidden="true"></span><span class="label">야경</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d08" data-kind="decoy" tabindex="0">
+      <div class="swatch c-orange"></div><span class="check" aria-hidden="true"></span><span class="label">QR 코드</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c06" data-kind="candidate" tabindex="0">
+      <div class="swatch c-pink"></div><span class="check" aria-hidden="true"></span><span class="label">꽃밭</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d09" data-kind="decoy" tabindex="0">
+      <div class="swatch c-green"></div><span class="check" aria-hidden="true"></span><span class="label">지도 스냅</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d10" data-kind="decoy" tabindex="0">
+      <div class="swatch c-blue"></div><span class="check" aria-hidden="true"></span><span class="label">UI 목업</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c07" data-kind="candidate" tabindex="0">
+      <div class="swatch c-indigo"></div><span class="check" aria-hidden="true"></span><span class="label">도서관</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d11" data-kind="decoy" tabindex="0">
+      <div class="swatch c-slate"></div><span class="check" aria-hidden="true"></span><span class="label">블러 중복본</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c08" data-kind="candidate" tabindex="0">
+      <div class="swatch c-teal"></div><span class="check" aria-hidden="true"></span><span class="label">자전거</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d12" data-kind="decoy" tabindex="0">
+      <div class="swatch c-brown"></div><span class="check" aria-hidden="true"></span><span class="label">명함 사진</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d13" data-kind="decoy" tabindex="0">
+      <div class="swatch c-gray"></div><span class="check" aria-hidden="true"></span><span class="label">워터마크 샘플</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c09" data-kind="candidate" tabindex="0">
+      <div class="swatch c-sky"></div><span class="check" aria-hidden="true"></span><span class="label">눈 내린 거리</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d14" data-kind="decoy" tabindex="0">
+      <div class="swatch c-rose"></div><span class="check" aria-hidden="true"></span><span class="label">스티커 시트</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-c10" data-kind="candidate" tabindex="0">
+      <div class="swatch c-orange"></div><span class="check" aria-hidden="true"></span><span class="label">강아지</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d15" data-kind="decoy" tabindex="0">
+      <div class="swatch c-violet"></div><span class="check" aria-hidden="true"></span><span class="label">썸네일 더미</span>
+    </div>
+    <div class="tile" role="gridcell" data-media-key="media-d16" data-kind="decoy" tabindex="0">
+      <div class="swatch c-lime"></div><span class="check" aria-hidden="true"></span><span class="label">로고 시안</span>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const countEl = document.getElementById("selection-count");
+      const deleteBtn = document.getElementById("btn-delete");
+      const tiles = Array.from(document.querySelectorAll(".tile[data-media-key]"));
+
+      function updateUi() {
+        const selected = tiles.filter((t) => t.classList.contains("selected"));
+        const n = selected.length;
+        countEl.textContent = "선택됨 " + n + "개";
+        countEl.dataset.count = String(n);
+        // Button stays non-operative for automation; enable only visually when selection > 0
+        deleteBtn.disabled = n === 0;
+      }
+
+      function toggleTile(tile) {
+        tile.classList.toggle("selected");
+        tile.setAttribute("aria-selected", tile.classList.contains("selected") ? "true" : "false");
+        updateUi();
+      }
+
+      tiles.forEach((tile) => {
+        tile.setAttribute("aria-selected", "false");
+        tile.addEventListener("click", () => toggleTile(tile));
+        tile.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleTile(tile);
+          }
+        });
+      });
+
+      // Human-only stub: alert, never used by PoC script
+      deleteBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        alert("삭제 기능은 이 픽스처에서 비활성입니다. (PoC는 선택까지만)");
+      });
+
+      updateUi();
+    })();
+  </script>
+</body>
+</html>
