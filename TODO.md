@@ -17,74 +17,23 @@ GOOGLE PHOTOS = still exists
 
 을 만족하는 **Real-Cloud Ghost Photo Ground-Truth Fixture**로 보존한다.
 
-### Ground Truth
-- 이번 cleanup에서 로컬 삭제된 테스트 미디어: **28개**
-- 파일명 목록:
-  1. `screen.png`
-  2. `app-screen.png`
-  3. `app-scroll.png`
-  4. `dump-screen.png`
-  5. `pass-screen.png`
-  6. `photos-screen.png`
-  7. `photos-selected.png`
-  8. `photo-detail.png`
-  9. `info-sheet.png`
-  10. `real-info.png`
-  11. `exif-info.png`
-  12. `test1-screen.png`
-  13. `test1_timeline.png`
-  14. `test2_detail.png`
-  15. `test3_search_tab.png`
-  16. `test3_search_result.png`
-  17. `t1_timeline.png`
-  18. `t2_detail_info.png`
-  19. `t3_search_result.png`
-  20. `t4_main_timeline.png`
-  21. `t5_selection_check.png`
-  22. `t3_search_20260828.png`
-  23. `t4_page1.png`
-  24. `t4_page2.png`
-  25. `adv_timeline.png`
-  26. `adv_live_timeline.png`
-  27. `photo_details_dump.png`
-  28. `cleanup_selected_state.png`
+### Ground Truth (28 Items)
+- `screen.png`, `app-screen.png`, `app-scroll.png`, `dump-screen.png`, `pass-screen.png`
+- `photos-screen.png`, `photos-selected.png`, `photo-detail.png`, `info-sheet.png`, `real-info.png`, `exif-info.png`
+- `test1-screen.png`, `test1_timeline.png`, `test2_detail.png`, `test3_search_tab.png`, `test3_search_result.png`
+- `t1_timeline.png`, `t2_detail_info.png`, `t3_search_result.png`, `t4_main_timeline.png`, `t5_selection_check.png`
+- `t3_search_20260828.png`, `t4_page1.png`, `t4_page2.png`
+- `adv_timeline.png`, `adv_live_timeline.png`, `photo_details_dump.png`, `cleanup_selected_state.png`
 - Google Photos에는 백업된 상태 유지.
 - 현재 cloud copy는 삭제하지 않으며, 사용자가 명시적으로 cleanup을 결정하기 전까지 테스트 fixture로 유지한다.
 
-### Future E2E Test
-향후 identity matching + candidate traversal이 구현된 뒤 이 fixture를 이용해 실제 end-to-end 검증을 수행한다.
+---
 
-**검증 흐름:**
-```text
-PhotoPlace/local history
-  └──► local deletion candidate
-        └──► Google Photos date search
-              └──► candidate traversal
-                    └──► Info metadata verification
-                          └──► CONFIDENT_MATCH / AMBIGUOUS / NOT_FOUND
-                                └──► CONFIDENT_MATCH만 selection
-                                      └──► selection count verification
-                                            └──► user manual delete
-```
-
-### Metrics & Acceptance Criteria
-반드시 다음 지표를 기록한다:
-- Ground truth cloud items: **28**
-- `CONFIDENT_MATCH` count
-- `AMBIGUOUS` count
-- `NOT_FOUND` count
-- `WRONG_MATCH` count
-- `Recall` = correctly found / 28
-- `False Positive` count
-
-> **가장 중요한 acceptance criterion**:  
-> `WRONG_MATCH = 0`  
-> (Recall이 다소 낮은 것은 허용하나, 확신할 수 없는 항목은 절대 선택하지 않는다.)
-
-### Important Rules
-- 이 28개 fixture를 새로운 테스트를 위해 복제하거나 추가 테스트 미디어를 생성하지 않는다.
-- Google Photos에서 자동 삭제하지 않는다. 최종 cleanup은 사용자가 직접 수행한다.
-- 현재는 TODO/HANDOFF 기록만 하고 E2E 테스트는 아직 실행하지 않는다.
+## 🎯 NEXT: Real-Cloud 28 Fixture E2E Matching 검증
+- **목표**: 28개 Ground-Truth fixture를 이용해 실제 E2E 탐색 및 매칭 수행.
+- **분류**: `CONFIDENT_MATCH` / `AMBIGUOUS` / `NOT_FOUND`
+- **Acceptance Criterion**: `WRONG_MATCH = 0` (Zero False Positives).
+- **Rule**: 확신할 수 없는 항목은 선택하지 않으며 Recall 다소 낮음 허용.
 
 ---
 
@@ -94,10 +43,10 @@ PhotoPlace/local history
 - [ ] 기존 collision dump에서 Info Sheet의 `filename` / `width` / `height` 노출 및 추출 일관성 확인
 - [ ] 다차원 메타데이터 기반 Matching Identity Rule & Score 상세 정의
 
-### P1 (Discovery & Traversal)
-- [ ] 날짜 검색 결과 candidate 전체 traversal(스크롤 순회) 안정성 검증
-- [ ] 마지막 candidate 도달 판정 및 `NOT_FOUND` 확정 조건 정의
-- [ ] 화면 스크롤 시 중복 처리 방지(Duplicate Traversal Prevention) 메커니즘 설계
+### P1 (Discovery & Traversal - ✅ 1차 검증 완료)
+- [x] 날짜 검색 결과 candidate 전체 traversal(스크롤 순회) 안정성 검증 (`2026-08-30 PASS: 63 candidates, 3 scrolls, End detected`)
+- [x] 마지막 candidate 도달 판정 및 `NOT_FOUND` 확정 조건 정의 (`Full Traversal + End Detection 완료 후 판정`)
+- [x] 화면 스크롤 시 중복 처리 방지(Duplicate Traversal Prevention) 메커니즘 설계 (`Overlap Deduplication 7 suppressed`)
 
 ### P2 (Edge Cases & Safety)
 - [ ] Metadata collision adversarial test (동일 분, 동일 해상도, 유사 용량 케이스)

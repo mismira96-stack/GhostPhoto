@@ -19,7 +19,7 @@ LOCAL = deleted
 GOOGLE PHOTOS = still exists
 ```
 
-을 만족하는 **Real-Cloud Ghost Photo Ground-Truth Fixture**로 보존한다.
+을 만족하는 **Real-Cloud Ghost Photo Ground-Truth Fixture (28개)**로 보존한다.
 
 ### Ground Truth (28 Items)
 - `screen.png`, `app-screen.png`, `app-scroll.png`, `dump-screen.png`, `pass-screen.png`
@@ -29,26 +29,24 @@ GOOGLE PHOTOS = still exists
 - `t3_search_20260828.png`, `t4_page1.png`, `t4_page2.png`
 - `adv_timeline.png`, `adv_live_timeline.png`, `photo_details_dump.png`, `cleanup_selected_state.png`
 
-### Future E2E Test Flow & Acceptance Criteria
-- **Flow**: Local history → deletion candidate → Google Photos date search → traversal → Info metadata verification → `CONFIDENT_MATCH` selection → count verification → user manual delete.
-- **Key Metric**: `WRONG_MATCH = 0` (False Positive = 0).
-- **Caution**: 추가 테스트 미디어를 생성하지 않고, Google Photos 내 자동 삭제는 일절 수행하지 않음.
-
 ---
 
-## 3. Key Architecture Findings
+## 3. Key Architecture & Traversal Findings
+
 1. **Grid-Level Matching 폐기**:
    - Google Photos 메인/검색 그리드는 분 단위까지만 `content-desc`에 노출하므로, 연사 또는 부재 중 임포스터가 있을 경우 오선택 위험 존재.
    - 따라서 `unique minute == exact identity` 규칙은 공식 폐기됨.
 2. **Info/Details Metadata 결합**:
    - Google Photos 뷰어에서 위로 스와이프하여 열리는 Info Sheet에는 `filename`, `width x height`, `size`, `device`, `location`이 노출됨.
    - 이를 로컬 MediaStore/PhotoPlace 메타데이터와 다차원 대조하여 고유성이 입증된 경우에만 `CONFIDENT_MATCH`로 처리.
-3. **Safety First**:
-   - 모호한 경우 `AMBIGUOUS`로 남기며, 자동 삭제는 구현하지 않음.
+3. **Date Search Traversal Completeness (2026-08-30 검증)**:
+   - `2026-08-29` 날짜 검색 화면에서 3회 스크롤 + 바닥 확인을 통해 **63개 고유 후보 전수 순회 완료 (`PASS`)**.
+   - 뷰포트 오버랩 7개 타일 중복 억제(Deduplication) 확인.
+   - **`NOT_FOUND` 상태 정의**: Full Traversal + End Detection(바닥 도달)이 완료된 이후에만 판정 가능.
+   - *주의: 본 결과는 이번 날짜/기기/UI 조건에서 관측 가능한 결과를 끝까지 traversal한 것이며, 1800ms settle delay 역시 이번 테스트에서 안정적으로 동작한 관측값임.*
 
 ---
 
 ## 4. Next Steps for Next Developer
-1. `FEASIBILITY_REPORT.md` 및 `TODO.md` 참고.
-2. P0 작업: 기존 dump 기반 `filename`/`resolution` 추출 안정성 분석 및 매칭 룰 정립.
-3. P1 작업: 날짜 검색 결과의 전체 스크롤 순회(Candidate traversal completeness) 구현.
+1. `WORKLOG.md`, `FEASIBILITY_REPORT.md` 및 `TODO.md` 참고.
+2. **NEXT Sprint**: 28개 Real-Cloud Ground-Truth fixture를 이용한 E2E matching 검증 수행 (`WRONG_MATCH = 0` acceptance criterion).
