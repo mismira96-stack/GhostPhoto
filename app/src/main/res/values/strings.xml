@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">GhostPhoto</string>
+    <string name="ghost_scan_title">유령 사진 (Ghost Photo) 탐색</string>
+    <string name="ghost_scan_desc">기기에서는 삭제되었지만 Google Photos에 남아 있는 사진을 안전하게 정리하도록 돕습니다.</string>
+    <string name="btn_start_scan">로컬 미디어 스캔 및 분석</string>
+    <string name="btn_open_google_photos">Google Photos 안전 선택 열기</string>
+    <string name="status_scanning">기기 미디어 및 소실 이력 분석 중...</string>
+    <string name="status_ready">스캔 준비 완료</string>
+    <string name="zero_false_positive_notice">🛡️ FALSE POSITIVE = 0 보장: 모호한 사진은 자동 선택하지 않으며, 최종 삭제는 사용자가 직접 확인합니다.</string>
+</resources>
