@@ -55,7 +55,8 @@ data class CloudCandidate(
 enum class MatchVerdict {
     CONFIDENT_MATCH,
     AMBIGUOUS,
-    NOT_FOUND
+    NOT_FOUND,
+    WRONG_MATCH
 }
 
 /**
