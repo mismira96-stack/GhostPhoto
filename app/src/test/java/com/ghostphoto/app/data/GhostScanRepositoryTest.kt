@@ -5,10 +5,12 @@ import com.ghostphoto.app.matcher.MediaLifecycleState
 import com.ghostphoto.app.scanner.ScanFetchResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 
 class GhostScanRepositoryTest {
 
@@ -113,5 +115,50 @@ class GhostScanRepositoryTest {
         val currentSnapshot = storage.loadSnapshot()
         assertEquals(1, currentSnapshot?.size)
         assertEquals(MediaLifecycleState.ACTIVE, currentSnapshot?.first()?.state)
+    }
+
+    @Test
+    fun coldRestart_persistence_preservesDataAcrossNewInstances() {
+        val tempFile = File.createTempFile("ghost_test_snapshot", ".json")
+        try {
+            // [앱 1회차 실행]
+            val media1 = LocalMediaRecord(501L, "persistent_01.jpg", 1788000000000L, 1080, 1920, 2048000L)
+            val media2 = LocalMediaRecord(502L, "persistent_02.jpg", 1788001000000L, 1920, 1080, 4096000L)
+
+            val fileStorage1 = FileSnapshotStorage(tempFile)
+            val repo1 = GhostScanRepository(
+                storage = fileStorage1,
+                mediaFetcher = { ScanFetchResult.Success(listOf(media1, media2)) }
+            )
+            val res1 = repo1.performScan() as ScanExecutionResult.Success
+            assertTrue(res1.isBaselineScan)
+
+            // [앱 프로세스 종료 및 재시작 시뮬레이션: repo1, storage1 완전히 폐기]
+            // [앱 2회차 실행 (Cold Restart)]
+            val fileStorage2 = FileSnapshotStorage(tempFile)
+            val restoredList = fileStorage2.loadSnapshot()
+            assertNotNull("Restored snapshot must not be null after cold restart", restoredList)
+            assertEquals(2, restoredList!!.size)
+
+            val item1 = restoredList.first { it.id == 501L }
+            assertEquals("persistent_01.jpg", item1.displayName)
+            assertEquals(1788000000000L, item1.takenAtMillis)
+            assertEquals(1080, item1.width)
+            assertEquals(1920, item1.height)
+            assertEquals(2048000L, item1.sizeBytes)
+            assertEquals(MediaLifecycleState.ACTIVE, item1.state)
+
+            // 2회차에서 media2 삭제 시뮬레이션
+            val repo2 = GhostScanRepository(
+                storage = fileStorage2,
+                mediaFetcher = { ScanFetchResult.Success(listOf(media1)) }
+            )
+            val res2 = repo2.performScan() as ScanExecutionResult.Success
+            assertFalse(res2.isBaselineScan)
+            assertEquals(1, res2.ghostCandidates.size)
+            assertEquals(502L, res2.ghostCandidates.first().id)
+        } finally {
+            tempFile.delete()
+        }
     }
 }

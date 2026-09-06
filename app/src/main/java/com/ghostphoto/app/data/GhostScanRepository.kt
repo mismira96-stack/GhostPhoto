@@ -8,6 +8,7 @@ import com.ghostphoto.app.scanner.LocalMediaScanner
 import com.ghostphoto.app.scanner.ScanFetchResult
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 /**
  * 스냅샷 영속화 인터페이스 (단위 테스트를 위해 분리)
@@ -19,43 +20,10 @@ interface SnapshotStorage {
 }
 
 /**
- * Android SharedPreferences 기반 스냅샷 저장소 구현체
+ * JSON 직렬화 및 역직렬화 전담 유틸리티
  */
-class SharedPrefsSnapshotStorage(context: Context) : SnapshotStorage {
-    private val prefs: SharedPreferences = context.getSharedPreferences("ghost_photo_history", Context.MODE_PRIVATE)
-
-    override fun loadSnapshot(): List<LocalMediaRecord>? {
-        val json = prefs.getString("snapshot_data", null) ?: return null
-        val list = mutableListOf<LocalMediaRecord>()
-        try {
-            val array = JSONArray(json)
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                list.add(
-                    LocalMediaRecord(
-                        id = obj.getLong("id"),
-                        displayName = obj.getString("displayName"),
-                        takenAtMillis = obj.getLong("takenAtMillis"),
-                        width = obj.getInt("width"),
-                        height = obj.getInt("height"),
-                        sizeBytes = obj.getLong("sizeBytes"),
-                        mimeType = obj.optString("mimeType", "image/jpeg"),
-                        relativePath = if (obj.has("relativePath")) obj.getString("relativePath") else null,
-                        state = MediaLifecycleState.valueOf(obj.optString("state", MediaLifecycleState.ACTIVE.name)),
-                        firstSeenAtMillis = obj.optLong("firstSeenAtMillis", System.currentTimeMillis()),
-                        lastSeenAtMillis = obj.optLong("lastSeenAtMillis", System.currentTimeMillis()),
-                        missingDetectedAtMillis = if (obj.has("missingDetectedAtMillis")) obj.getLong("missingDetectedAtMillis") else null
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
-        }
-        return list
-    }
-
-    override fun saveSnapshot(records: List<LocalMediaRecord>) {
+object SnapshotJsonSerializer {
+    fun serialize(records: List<LocalMediaRecord>): String {
         val array = JSONArray()
         for (item in records) {
             val obj = JSONObject().apply {
@@ -76,7 +44,77 @@ class SharedPrefsSnapshotStorage(context: Context) : SnapshotStorage {
             }
             array.put(obj)
         }
-        prefs.edit().putString("snapshot_data", array.toString()).apply()
+        return array.toString()
+    }
+
+    fun deserialize(json: String): List<LocalMediaRecord> {
+        val list = mutableListOf<LocalMediaRecord>()
+        val array = JSONArray(json)
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            list.add(
+                LocalMediaRecord(
+                    id = obj.getLong("id"),
+                    displayName = obj.getString("displayName"),
+                    takenAtMillis = obj.getLong("takenAtMillis"),
+                    width = obj.getInt("width"),
+                    height = obj.getInt("height"),
+                    sizeBytes = obj.getLong("sizeBytes"),
+                    mimeType = obj.optString("mimeType", "image/jpeg"),
+                    relativePath = if (obj.has("relativePath")) obj.getString("relativePath") else null,
+                    state = MediaLifecycleState.valueOf(obj.optString("state", MediaLifecycleState.ACTIVE.name)),
+                    firstSeenAtMillis = obj.optLong("firstSeenAtMillis", System.currentTimeMillis()),
+                    lastSeenAtMillis = obj.optLong("lastSeenAtMillis", System.currentTimeMillis()),
+                    missingDetectedAtMillis = if (obj.has("missingDetectedAtMillis")) obj.getLong("missingDetectedAtMillis") else null
+                )
+            )
+        }
+        return list
+    }
+}
+
+/**
+ * 파일 기반 영속 스냅샷 저장소 구현체 (Cold Restart 및 대용량 데이터 대응)
+ */
+class FileSnapshotStorage(private val file: File) : SnapshotStorage {
+    override fun loadSnapshot(): List<LocalMediaRecord>? {
+        if (!file.exists()) return null
+        return try {
+            SnapshotJsonSerializer.deserialize(file.readText())
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override fun saveSnapshot(records: List<LocalMediaRecord>) {
+        file.parentFile?.mkdirs()
+        file.writeText(SnapshotJsonSerializer.serialize(records))
+    }
+
+    override fun clear() {
+        if (file.exists()) file.delete()
+    }
+}
+
+/**
+ * Android SharedPreferences 기반 스냅샷 저장소 구현체
+ */
+class SharedPrefsSnapshotStorage(context: Context) : SnapshotStorage {
+    private val prefs: SharedPreferences = context.getSharedPreferences("ghost_photo_history", Context.MODE_PRIVATE)
+
+    override fun loadSnapshot(): List<LocalMediaRecord>? {
+        val json = prefs.getString("snapshot_data", null) ?: return null
+        return try {
+            SnapshotJsonSerializer.deserialize(json)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    override fun saveSnapshot(records: List<LocalMediaRecord>) {
+        val json = SnapshotJsonSerializer.serialize(records)
+        prefs.edit().putString("snapshot_data", json).apply()
     }
 
     override fun clear() {
