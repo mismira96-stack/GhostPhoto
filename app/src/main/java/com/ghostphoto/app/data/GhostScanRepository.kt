@@ -99,8 +99,15 @@ class FileSnapshotStorage(private val file: File) : SnapshotStorage {
 /**
  * Android SharedPreferences 기반 스냅샷 저장소 구현체
  */
-class SharedPrefsSnapshotStorage(context: Context) : SnapshotStorage {
-    private val prefs: SharedPreferences = context.getSharedPreferences("ghost_photo_history", Context.MODE_PRIVATE)
+class SharedPrefsSnapshotStorage(
+    context: Context,
+    prefsName: String = DEFAULT_PREFS_NAME
+) : SnapshotStorage {
+    companion object {
+        const val DEFAULT_PREFS_NAME = "ghost_photo_history"
+    }
+
+    private val prefs: SharedPreferences = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
     override fun loadSnapshot(): List<LocalMediaRecord>? {
         val json = prefs.getString("snapshot_data", null) ?: return null
@@ -146,7 +153,12 @@ sealed class ScanExecutionResult {
         val totalLocalCount: Int,
         val ghostCandidates: List<LocalMediaRecord>,
         val recoveredCount: Int = 0
-    ) : ScanExecutionResult()
+    ) : ScanExecutionResult() {
+        /**
+         * 도메인 중립적 명칭 프로퍼티 (PhotoPlace 등 일반 미디어 수명주기 관리 모듈 호환용)
+         */
+        val missingRecords: List<LocalMediaRecord> get() = ghostCandidates
+    }
 
     data class Aborted(
         val reason: String,
@@ -155,25 +167,45 @@ sealed class ScanExecutionResult {
 }
 
 /**
+ * 로컬 미디어 히스토리 및 소실 감지 추적기 인터페이스.
+ * 특정 앱 도메인(GhostPhoto)에 종속되지 않는 범용 로컬 미디어 생명주기 계약.
+ */
+interface LocalMediaHistoryTracker {
+    fun performScan(): ScanExecutionResult
+    fun getSnapshot(): List<LocalMediaRecord>?
+    fun clearHistory()
+}
+
+/**
  * 로컬 미디어 히스토리 및 델타 감지 레포지토리.
  *
+ * 앱 도메인(GhostPhoto / PhotoPlace)에 종속되지 않는 범용 로컬 미디어 라이프사이클 추적 엔진.
+ *
  * 안전 규칙:
- * 1. First scan: baseline snapshot 생성 (0 ghost candidates).
+ * 1. First scan: baseline snapshot 생성 (0 missing records).
  * 2. Subsequent scan: previous snapshot vs current MediaStore -> disappeared media detection.
  * 3. Recovery: 이전에 MISSING이었던 아이템이 다시 발견되면 ACTIVE로 복구.
  * 4. Scan Validity: 쿼리 실패 / 권한 에러 시 스냅샷을 오염시키지 않고 즉시 Abort (대량 False Missing 방지).
  */
-class GhostScanRepository(
+open class LocalMediaHistoryRepository(
     private val storage: SnapshotStorage,
     private val mediaFetcher: () -> ScanFetchResult
-) {
+) : LocalMediaHistoryTracker {
 
-    constructor(context: Context) : this(
-        storage = SharedPrefsSnapshotStorage(context),
-        mediaFetcher = { LocalMediaScanner(context).scanAllLocalMedia() }
+    constructor(
+        context: Context,
+        prefsName: String = SharedPrefsSnapshotStorage.DEFAULT_PREFS_NAME,
+        scanner: LocalMediaScanner = LocalMediaScanner(context)
+    ) : this(
+        storage = SharedPrefsSnapshotStorage(context, prefsName),
+        mediaFetcher = { scanner.scanAllLocalMedia() }
     )
 
-    fun performScan(): ScanExecutionResult {
+    override fun getSnapshot(): List<LocalMediaRecord>? = storage.loadSnapshot()
+
+    override fun clearHistory() = storage.clear()
+
+    override fun performScan(): ScanExecutionResult {
         // 1. Scan Validity 확인: 쿼리 실패나 권한 문제 시 정상 빈 스캔으로 오인하지 않고 즉시 중단
         val fetchResult = mediaFetcher()
         if (fetchResult is ScanFetchResult.Failure) {
@@ -269,3 +301,9 @@ class GhostScanRepository(
         )
     }
 }
+
+/**
+ * FindGhostPhoto 앱 전용 별칭 (100% 하위 호환성 유지)
+ */
+typealias GhostScanRepository = LocalMediaHistoryRepository
+

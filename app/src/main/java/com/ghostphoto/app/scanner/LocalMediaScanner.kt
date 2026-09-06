@@ -14,9 +14,17 @@ sealed class ScanFetchResult {
 }
 
 /**
+ * 로컬 미디어 스캐너 인터페이스.
+ * 플랫폼(MediaStore) 또는 모의 스캐너를 교체 가능하도록 추상화하여 PhotoPlace 등 타 모듈 재사용 지원.
+ */
+interface MediaScanner {
+    fun scanAllLocalMedia(): ScanFetchResult
+}
+
+/**
  * Android MediaStore를 조회하여 현재 로컬 저장소에 존재하는 미디어(사진/영상) 목록을 스캔합니다.
  */
-class LocalMediaScanner(private val context: Context) {
+class LocalMediaScanner(private val context: Context) : MediaScanner {
 
     private val projection = arrayOf(
         MediaStore.MediaColumns._ID,
@@ -29,7 +37,7 @@ class LocalMediaScanner(private val context: Context) {
         MediaStore.MediaColumns.RELATIVE_PATH
     )
 
-    fun scanAllLocalMedia(): ScanFetchResult {
+    override fun scanAllLocalMedia(): ScanFetchResult {
         val results = mutableListOf<LocalMediaRecord>()
 
         val imgResult = scanUri(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/jpeg")

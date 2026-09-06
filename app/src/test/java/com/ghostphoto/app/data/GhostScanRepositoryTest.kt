@@ -161,4 +161,33 @@ class GhostScanRepositoryTest {
             tempFile.delete()
         }
     }
+
+    @Test
+    fun domainNeutralContract_trackerInterfaceAndMissingRecords_workIdentically() {
+        val memoryStorage = InMemorySnapshotStorage()
+        val media1 = LocalMediaRecord(701L, "neutral_1.jpg", 1000L, 1080, 1920, 2000000L)
+        val media2 = LocalMediaRecord(702L, "neutral_2.jpg", 2000L, 1080, 1920, 3000000L)
+
+        // LocalMediaHistoryTracker 인터페이스 다형성 및 도메인 중립성 확인
+        val tracker: LocalMediaHistoryTracker = LocalMediaHistoryRepository(
+            storage = memoryStorage,
+            mediaFetcher = { ScanFetchResult.Success(listOf(media1, media2)) }
+        )
+
+        val res1 = tracker.performScan() as ScanExecutionResult.Success
+        assertTrue(res1.isBaselineScan)
+        assertEquals(0, res1.missingRecords.size)
+        assertEquals(res1.ghostCandidates, res1.missingRecords)
+
+        // media2 소실 시뮬레이션
+        val tracker2: LocalMediaHistoryTracker = LocalMediaHistoryRepository(
+            storage = memoryStorage,
+            mediaFetcher = { ScanFetchResult.Success(listOf(media1)) }
+        )
+        val res2 = tracker2.performScan() as ScanExecutionResult.Success
+        assertEquals(1, res2.missingRecords.size)
+        assertEquals(702L, res2.missingRecords.first().id)
+        assertEquals("ghostCandidates와 missingRecords가 동일해야 함", res2.ghostCandidates, res2.missingRecords)
+        assertEquals(2, tracker2.getSnapshot()?.size)
+    }
 }
