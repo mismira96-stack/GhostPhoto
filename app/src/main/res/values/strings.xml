@@ -7,4 +7,6 @@
     <string name="status_scanning">기기 미디어 및 소실 이력 분석 중...</string>
     <string name="status_ready">스캔 준비 완료</string>
     <string name="zero_false_positive_notice">🛡️ FALSE POSITIVE = 0 보장: 모호한 사진은 자동 선택하지 않으며, 최종 삭제는 사용자가 직접 확인합니다.</string>
+    <string name="accessibility_service_label">FindGhostPhoto 자동 정리 도우미</string>
+    <string name="accessibility_service_description">Google Photos에서 기기에서 삭제된 소실 사진을 안전하게 식별하여 일괄 휴지통 정리를 보조합니다.</string>
 </resources>

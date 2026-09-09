@@ -17,7 +17,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
+import androidx.appcompat.app.AlertDialog
+import com.ghostphoto.app.accessibility.AccessibilityHelper
+import com.ghostphoto.app.accessibility.GhostAccessibilityService
+import com.ghostphoto.app.matcher.LiveGroundTruthCoordinator
 import com.ghostphoto.app.matcher.LocalMediaRecord
 import com.ghostphoto.app.matcher.MediaLifecycleState
 import java.text.SimpleDateFormat
@@ -57,7 +62,98 @@ class MainActivity : AppCompatActivity() {
             checkPermissionsAndScan()
         }
 
+        binding.btnAccessibilityStatus.setOnClickListener {
+            AccessibilityHelper.openAccessibilitySettings(this)
+            Toast.makeText(this, "설정 > 설치된 앱 > FindGhostPhoto에서 접근성을 켜주세요.", Toast.LENGTH_LONG).show()
+        }
+
+        binding.btnLiveCollect.setOnClickListener {
+            handleLiveCollectClick()
+        }
+
+        binding.btnViewReport.setOnClickListener {
+            showEvaluationReportDialog()
+        }
+
+        GhostAccessibilityService.onStatusChanged = { statusText ->
+            binding.tvStatus.text = statusText
+            updateAccessibilityStatus()
+        }
+
+        GhostAccessibilityService.onCandidateObserved = { candidate, count ->
+            binding.tvStatus.text = "후보 수집 중 (${count}개): ${candidate.filename}"
+        }
+
         displayCachedCandidates()
+        updateAccessibilityStatus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateAccessibilityStatus()
+    }
+
+    private fun updateAccessibilityStatus() {
+        val isEnabled = AccessibilityHelper.isAccessibilityServiceEnabled(
+            this,
+            GhostAccessibilityService::class.java
+        )
+        if (isEnabled) {
+            binding.btnAccessibilityStatus.text = "접근성: 🟢 켜짐"
+        } else {
+            binding.btnAccessibilityStatus.text = "접근성: 🔴 꺼짐 (설정)"
+        }
+    }
+
+    private fun handleLiveCollectClick() {
+        val isEnabled = AccessibilityHelper.isAccessibilityServiceEnabled(
+            this,
+            GhostAccessibilityService::class.java
+        )
+
+        if (!isEnabled) {
+            AlertDialog.Builder(this)
+                .setTitle("접근성 권한 필요")
+                .setMessage("구글포토에서 소실 사진을 자동으로 식별(Read-Only)하려면 접근성 권한이 필요합니다.\n\n설정 화면으로 이동하시겠습니까?")
+                .setPositiveButton("설정으로 이동") { _, _ ->
+                    AccessibilityHelper.openAccessibilitySettings(this)
+                }
+                .setNegativeButton("취소", null)
+                .show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("구글포토 실시간 수집 시작 (P2-A)")
+            .setMessage("Google Photos 앱을 열고 검색 화면(예: 2026-08-29)에서 첫 번째 사진을 열면, 백그라운드 수집기가 스와이프하며 메타데이터를 수집합니다.\n\n(원칙: 100% Read-Only, Zero-Delete 보장)\n\n지금 시작하시겠습니까?")
+            .setPositiveButton("시작") { _, _ ->
+                GhostAccessibilityService.startCollecting()
+                val launchIntent = packageManager.getLaunchIntentForPackage("com.google.android.apps.photos")?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (launchIntent != null) {
+                    startActivity(launchIntent)
+                    Toast.makeText(this, "구글포토로 이동합니다. 날짜 검색 후 사진을 열어주세요.", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, "Google Photos 앱을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    private fun showEvaluationReportDialog() {
+        val observed = GhostAccessibilityService.observedCandidates
+        val coordinator = LiveGroundTruthCoordinator()
+        val (metrics, items) = coordinator.evaluateLiveCandidates(observed)
+
+        val reportText = metrics.toSummaryReport()
+
+        AlertDialog.Builder(this)
+            .setTitle("P2-A Ground-Truth 대조 리포트")
+            .setMessage(reportText)
+            .setPositiveButton("확인", null)
+            .show()
     }
 
     private fun displayCachedCandidates() {
@@ -85,10 +181,13 @@ class MainActivity : AppCompatActivity() {
         try {
             val intent = Intent(Intent.ACTION_VIEW, searchUri).apply {
                 setPackage("com.google.android.apps.photos")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(intent)
         } catch (e: Exception) {
-            val browserIntent = Intent(Intent.ACTION_VIEW, searchUri)
+            val browserIntent = Intent(Intent.ACTION_VIEW, searchUri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
             startActivity(browserIntent)
         }
     }

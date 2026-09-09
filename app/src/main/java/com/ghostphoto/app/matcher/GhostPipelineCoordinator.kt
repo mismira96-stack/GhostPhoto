@@ -17,6 +17,8 @@ data class PipelineE2EReport(
     val notFoundCount: Int get() = notFoundMatches.size
     val wrongCount: Int get() = wrongMatches.size
 
+    val allResults: List<MatchResult> get() = confidentMatches + ambiguousMatches + notFoundMatches + wrongMatches
+
     val isWrongMatchZero: Boolean get() = wrongCount == 0
 
     fun toSummaryString(): String {

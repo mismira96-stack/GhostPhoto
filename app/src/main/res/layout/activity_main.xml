@@ -21,12 +21,45 @@
         android:textColor="#555555"
         android:textSize="12sp" />
 
-    <Button
-        android:id="@+id/btn_scan"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="로컬 미디어 스캔 실행" />
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp">
+
+        <Button
+            android:id="@+id/btn_scan"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="로컬 스캔" />
+
+        <Button
+            android:id="@+id/btn_accessibility_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1.2"
+            android:backgroundTint="#F1F3F4"
+            android:textColor="#3C4043"
+            android:text="접근성 설정" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_live_collect"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:backgroundTint="#1A73E8"
+        android:text="🔍 P2-A: 구글포토 실시간 수집 시작 (Read-Only)" />
+
+    <Button
+        android:id="@+id/btn_view_report"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:backgroundTint="#5F6368"
+        android:text="📊 28건 Ground-Truth 대조 리포트 보기" />
 
     <TextView
         android:id="@+id/tv_status"

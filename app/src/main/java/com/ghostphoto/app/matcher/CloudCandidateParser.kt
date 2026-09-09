@@ -29,7 +29,14 @@ object CloudCandidateParser {
         val contentDescList = mutableListOf<String>()
 
         collectTexts(doc.documentElement, textList, contentDescList)
+        return parseFromTexts(textList, contentDescList, candidateId)
+    }
 
+    fun parseFromTexts(
+        textList: List<String>,
+        contentDescList: List<String> = emptyList(),
+        candidateId: String = "candidate_parsed"
+    ): CloudCandidate {
         var dateStr: String? = null
         var timeMinuteStr: String? = null
         var filename: String? = null
@@ -42,7 +49,7 @@ object CloudCandidateParser {
         val dateTimeRegex = Regex("""(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일.*?((?:오전|오후)\s*\d{1,2}:\d{2})""")
         val resRegex = Regex("""^(\d{3,5})\s*x\s*(\d{3,5})$""")
         val sizeRegex = Regex("""(?:백업됨\s*[•·]\s*)?([0-9]+(?:\.[0-9]+)?\s*(?:MB|KB|GB))""", RegexOption.IGNORE_CASE)
-        val fileRegex = Regex("""^[\w\-\.]+\.(png|jpg|jpeg|mp4|mov|gif|webp)$""", RegexOption.IGNORE_CASE)
+        val fileRegex = Regex("""^[\p{L}\p{N}\-_.\s]+\.(png|jpg|jpeg|mp4|mov|gif|webp)$""", RegexOption.IGNORE_CASE)
 
         for (text in textList) {
             val t = text.trim()
