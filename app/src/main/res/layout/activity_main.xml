@@ -45,6 +45,14 @@
         android:text="소실 감지된 미디어 (Ghost Candidates):"
         android:textStyle="bold" />
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="💡 카드나 [구글포토 ↗]를 누르면 해당 날짜의 구글포토 검색창으로 바로 이동합니다."
+        android:textColor="#1967D2"
+        android:textSize="12sp" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_candidates"
         android:layout_width="match_parent"

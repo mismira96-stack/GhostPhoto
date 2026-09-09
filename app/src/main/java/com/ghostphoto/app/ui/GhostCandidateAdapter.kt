@@ -50,6 +50,9 @@ class GhostCandidateAdapter(
             binding.root.setOnClickListener {
                 onItemClick(item)
             }
+            binding.btnOpenPhotos.setOnClickListener {
+                onItemClick(item)
+            }
         }
     }
 }

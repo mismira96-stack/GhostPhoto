@@ -13,11 +13,24 @@ import com.ghostphoto.app.data.GhostScanRepository
 import com.ghostphoto.app.data.ScanExecutionResult
 import com.ghostphoto.app.databinding.ActivityMainBinding
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import com.ghostphoto.app.matcher.LocalMediaRecord
+import com.ghostphoto.app.matcher.MediaLifecycleState
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var repository: GhostScanRepository
-    private val adapter = GhostCandidateAdapter()
+    private val adapter = GhostCandidateAdapter { item ->
+        openGooglePhotosForCandidate(item)
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -42,6 +55,41 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnScan.setOnClickListener {
             checkPermissionsAndScan()
+        }
+
+        displayCachedCandidates()
+    }
+
+    private fun displayCachedCandidates() {
+        val snapshot = repository.getSnapshot() ?: return
+        val missing = snapshot.filter { it.state == MediaLifecycleState.MISSING_FROM_LOCAL_SCAN }
+        if (missing.isNotEmpty()) {
+            binding.tvStatus.text = "기록된 스냅샷: 기기 ${snapshot.size}개 중 소실 후보 ${missing.size}건 감지됨"
+            adapter.submitList(missing)
+        }
+    }
+
+    private fun openGooglePhotosForCandidate(item: LocalMediaRecord) {
+        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(item.takenAtMillis))
+
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("filename", item.displayName))
+
+        Toast.makeText(
+            this,
+            "구글포토 [$dateStr]로 이동합니다.\n(파일명 복사됨: ${item.displayName})",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        val searchUri = Uri.parse("https://photos.google.com/search/$dateStr")
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, searchUri).apply {
+                setPackage("com.google.android.apps.photos")
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            val browserIntent = Intent(Intent.ACTION_VIEW, searchUri)
+            startActivity(browserIntent)
         }
     }
 
