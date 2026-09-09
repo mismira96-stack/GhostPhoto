@@ -65,9 +65,9 @@ object CloudCandidateParser {
                 height = resMatch.groupValues[2].toIntOrNull()
             }
 
-            // 3. 용량: "백업됨 • 2.8MB" 또는 "7.7MB"
+            // 3. 용량: "백업됨 • 2.8MB" 또는 "539kB"
             val sizeMatch = sizeRegex.find(t)
-            if (sizeMatch != null && displayedSizeText == null && (t.contains("MB") || t.contains("KB") || t.contains("GB"))) {
+            if (sizeMatch != null && displayedSizeText == null) {
                 displayedSizeText = t
             }
 
