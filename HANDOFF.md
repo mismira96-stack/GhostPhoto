@@ -48,20 +48,30 @@ GOOGLE PHOTOS = still exists
    - 기능 검증용 최소 버튼, 상태 텍스트, 후보 리스트 RecyclerView 구현.
 
 5. **검증 현황**:
-   - 단위 테스트 11/11 PASS (`GhostMatcherTest` 7건 + `GhostScanRepositoryTest` 4건).
-     *(주의: realFixture 테스트는 실제 Google Photos E2E가 아니라, 기 수집된 실측 metadata를 이용한 unit-test fixture임)*
+   - 단위 테스트 13/13 PASS (`GhostMatcherTest`, `GhostScanRepositoryTest`, `SafePipelineTest`, `GooglePhotosGridSelectorTest`).
    - `assembleDebug` BUILD SUCCESSFUL (`app-debug.apk` 정상 생성).
+   - 실기기 SM-F971N E2E 벤치마크 4회 완료 (Zero-Delete 100% 준수).
 
 ---
 
-## 4. Next Steps for Next Developer (TODO 요약)
+## 4. Native Accessibility Service State & Critical Findings (2026-09-10)
 
-- **P0**:
-  - `SharedPrefsSnapshotStorage` 영속화가 실제 앱 프로세스 재시작(cold restart) 후에도 완벽히 유지되는지 실기기/에뮬레이터 상에서 확인 (필요 시 Room DB 등으로 고도화).
-- **P1**:
-  - Google Photos `CloudCandidate` 수집기(UIAutomator/Accessibility Collector)와 `MatchEngine` 사이의 Adapter/Interface 구축.
-  - 실제 Google Photos의 표시 크기(MB vs MiB, 반올림 표기 규칙) 정책 실기기 정밀 검증.
-- **P2**:
-  - 보존된 28개 Real-Cloud Ground-Truth Fixture를 이용한 실제 E2E 탐색/대조 실행 및 `CONFIDENT_MATCH` / `AMBIGUOUS` / `NOT_FOUND` / `WRONG_MATCH` 지표 측정.
-- **Future Optional**:
-  - PhotoPlace 미디어 히스토리 연동 (Core 로드맵에서는 제외, 추후 선택적 연동으로만 고려).
+1. **Native E2E 파이프라인 구현 완료 (`com.ghostphoto.app.accessibility`)**:
+   - `GhostAccessibilityService`, `SafePipelineEngine`, `GooglePhotosGridSelector`: 무ADB 온디바이스 자동화 파이프라인 구축 완료.
+   - `Samsung Freecess 방지`: `Foreground Service` (Notification FGS) 연동.
+   - `Candidate Timestamp Consistency Guard`: Details 파일명과 그리드 시간의 오차를 검증하여 불일치 시 `AMBIGUOUS`로 안전 격리.
+
+2. **최근 벤치마크 Incident & 근본 원인**:
+   - **대용량 동영상 선택**: `LocalMediaScanner`가 동영상(`video/mp4`)도 스캔하여 타겟 DB에 진입함. -> `mimeType.startsWith("image/")` 필터 필요.
+   - **개인 사진 오선택**: 날짜 뷰(`2026-09-05`)에서 확인한 Minute/Index를 월간 뷰(`2026-09`)에서 재사용하면서 Grid Drift 및 동일 분(14:00) 중복 미디어 충돌 발생.
+
+3. **1-Pass Verify-and-Select Spike 결과 (절대 UI 제약 증명)**:
+   - Google Photos는 ActionMode(다중 선택) 중 Details 진입이 불가능하며, ActionMode를 해제하면 선택이 0으로 리셋됨.
+   - 따라서 **"1-Pass로 선택을 유지하며 다음 후보를 계속 검증하는 구조"는 클라이언트 제약상 불가능함**.
+
+4. **Next Agent / Developer Action Items**:
+   - **[P0-1] Image-Only Filter**: `GhostAccessibilityService.startSafePipeline`에 `missing.filter { it.mimeType.startsWith("image/") }` 적용.
+   - **[P0-2] In-Place (Same-View) Date-Session 2-Pass 구현**:
+     - 월간 뷰로 이동하지 않고, **동일 날짜 검색 화면 내에서** Pass 1(검증)과 Pass 2(선택)를 모두 완료하는 구조로 전환.
+     - 날짜별 단위 일괄 선택 후 사용자 확인/다음 날짜 처리.
+   - **[P0-3] Zero-Delete 유지**: 휴지통/삭제 버튼은 절대 누르지 않고, 선택 완료 화면에서 정지하여 사용자의 검수를 받는다.

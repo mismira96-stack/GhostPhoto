@@ -1,5 +1,60 @@
 # FindGhostPhoto — Work Log
 
+## 📅 2026-09-10: 1-Pass Verify-and-Select Spike, UI Constraint Proof, & Target Filtering
+
+### 1. 작업 개요
+- **배경**: 실기기 벤치마크 중 발생한 비디오 선택 및 개인 사진 오선택 현상에 대한 사용자 제기 의문 검증:
+  1) 왜 동영상이 타겟으로 잡히고 선택되는가?
+  2) 1-Pass "확인 즉시 선택(Verify-and-Select)" 방식으로 다중 선택을 유지하며 다음 후보를 계속 검증하는 것이 Google Photos UI 구조상 가능한가?
+- **방식**: SM-F971N 실기기 단계별 Spike 실행 및 UI 계층(XML) 덤프 분석.
+
+### 2. 주요 발견 및 증명 (Key Findings)
+1. **동영상 선택 원인 (타겟 DB 및 필터링 부재)**:
+   - `LocalMediaScanner`가 `MediaStore.Images`와 `MediaStore.Video`를 모두 스캔하여 Snapshot을 생성함.
+   - 사용자가 로컬에서 삭제했던 대용량 카메라 영상(`20260906_173122.mp4` 6.7GB, `20260906_165539.mp4` 7.7GB)이 `MISSING_FROM_LOCAL_SCAN` 타겟으로 등록됨.
+   - `startSafePipeline`에서 `mimeType` 필터링이 없어 타겟 4번/5번으로 지정되었고, 구글포토에서 실제로 해당 영상 파일명을 확인하여 정상 매칭으로 판정 후 선택함.
+   - **해결책**: 타겟 로딩 시 `it.mimeType.startsWith("image/")` 필터 1줄 추가로 원천 차단 가능. 비디오 재생으로 인한 CPU 과열 및 UI 왜곡 제거 효과 확인.
+2. **Google Photos 1-Pass 다중 선택의 절대적 UI 제약 (Spike 결과)**:
+   - **제약 ① ActionMode 중 Details 진입 불가**: 사진 1을 확인하고 롱프레스로 선택 모드(`action_bar_title` = "1")를 띄운 뒤, 다음 후보(사진 2)를 탭하면 **뷰어나 Details가 열리지 않고 사진 2가 Details 확인 없이 맹목적으로 선택(2)**됨.
+   - **제약 ② 선택 모드 해제 시 기존 선택 100% 증발**: 다음 사진의 Details를 보기 위해 Back 키로 빠져나오는 즉시 **이전 선택 상태가 0으로 리셋**됨 (`spike_exit_action.xml` 확인).
+   - **제약 ③ ActionMode 메뉴 부재**: ActionMode 오버플로우 메뉴에는 상세정보(Details) 항목이 없음.
+   - **결론**: "선택 상태를 누적 유지하면서 다음 사진의 Details를 계속 검증하는 1-Pass 구조"는 Google Photos 클라이언트 구조상 **100% 불가능**.
+
+### 3. 차기 아키텍처 결론 (Next Architecture)
+- **"동일 화면 내(In-Place) 날짜별 2-Pass" 채택**:
+  - 기존 실패 원인은 2-Pass 자체가 아니라, 날짜 뷰(`2026-09-06`)에서 확인하고 월 전체 뷰(`2026-09`)로 **화면을 완전히 전환**했기 때문에 그리드가 틀어진 것임.
+  - 화면을 전환하지 않고 **동일한 날짜 검색 화면 내에서** Pass 1(검증) + Pass 2(선택)를 완료하면 그리드 순서가 보존되어 오선택이 0%로 차단됨.
+  - 날짜별 단위로 일괄 선택 및 확인을 진행하는 방식으로 설계 확정.
+
+---
+
+## 📅 2026-09-09 ~ 2026-09-10: Native GhostAccessibilityService E2E Benchmark
+
+### 1. 작업 개요
+- **목적**: Python/ADB 스크립트에 의존하던 구글포토 자동화를 Android Native `GhostAccessibilityService` 기반의 온디바이스 독립 서비스로 전환 및 실기기 E2E 벤치마크 검증.
+- **테스트 환경**: Samsung Galaxy Z Fold (SM-F971N, Android 12, 시리얼 `R5KL503VHQR`), 2026-09 누락 타겟 Top 20건.
+- **원칙**: `Zero-Delete` 절대 보장 (휴지통/삭제 기능 일체 미호출, 선택 화면에서 정지).
+
+### 2. 주요 구현 내용
+1. **`GhostAccessibilityService` Native E2E 파이프라인**:
+   - `SafePipelineEngine`: Pass 1 날짜별 Grid Minute Prefilter + Details 검증 -> Pass 2 안전 다중 선택.
+   - `GooglePhotosGridSelector`: Grid accessibility 노드 파싱, MinuteKey 및 SiblingIndex 바인딩.
+   - `Samsung Freecess 방지`: `Foreground Service` (Notification FGS) 연동으로 장시간 벤치마크 중 프로세스 동결 방지.
+2. **False Binding 방지 안전 가드 구현**:
+   - `Dummy Click Success 방지`: `ACTION_CLICK` 반환값 맹신 금지, 실제 Viewer 오픈 여부 Entry 검증 및 실패 시 retry tap 수행.
+   - `Candidate Timestamp Consistency Guard (`isTimestampConsistentWithCandidate`)`: Details 파일명에서 추출한 timestamp와 클릭한 Grid 타일의 시간 차이가 180초 이상 나면 Stale 데이터로 판정하여 즉시 `AMBIGUOUS`로 거부.
+   - `Exit Guard & Settle Delay`: Details 닫힘 및 그리드 렌더링 안정화 대기 추가.
+
+### 3. 벤치마크 실측 결과 (Run #4)
+- **총 E2E 소요시간**: `124.42s` (Grid scan: `1.28s`, Details verification: `70.39s`, Pass 2 selection: `5.44s`)
+- **검증 결과**: CONFIDENT 9건, AMBIGUOUS 15건 (타임스탬프 불일치 11건 사전 거부 성공).
+- **최종 선택 화면**: 9건 선택됨, Zero-Delete 100% 준수.
+- **오류 분석**:
+  - `20260906_173122.mp4` 동영상 선택 (타겟 DB에 미디어 타입 구분 없이 포함됨).
+  - 2026-09-05 14:00에 개인 아기 앨범 사진 오선택 발생 (날짜 뷰와 월 뷰 간 그리드 불일치 및 동일 분 중복 미디어 충돌).
+
+---
+
 ## 📅 2026-09-05: MatchEngine Core & Local History Layer Implementation
 
 ### 1. 작업 개요

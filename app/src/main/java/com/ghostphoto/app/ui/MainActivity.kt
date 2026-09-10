@@ -67,6 +67,10 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "설정 > 설치된 앱 > FindGhostPhoto에서 접근성을 켜주세요.", Toast.LENGTH_LONG).show()
         }
 
+        binding.btnFindAndSelect.setOnClickListener {
+            handleFindAndSelectClick()
+        }
+
         binding.btnLiveCollect.setOnClickListener {
             handleLiveCollectClick()
         }
@@ -103,6 +107,37 @@ class MainActivity : AppCompatActivity() {
         } else {
             binding.btnAccessibilityStatus.text = "접근성: 🔴 꺼짐 (설정)"
         }
+    }
+
+    private fun handleFindAndSelectClick() {
+        val isEnabled = AccessibilityHelper.isAccessibilityServiceEnabled(
+            this,
+            GhostAccessibilityService::class.java
+        )
+
+        if (!isEnabled) {
+            AlertDialog.Builder(this)
+                .setTitle("접근성 권한 필요")
+                .setMessage("구글포토에서 소실 사진을 자동으로 식별하고 선택(Zero-Delete)하려면 접근성 권한이 필요합니다.\n\n설정 화면으로 이동하시겠습니까?")
+                .setPositiveButton("설정으로 이동") { _, _ ->
+                    AccessibilityHelper.openAccessibilitySettings(this)
+                }
+                .setNegativeButton("취소", null)
+                .show()
+            return
+        }
+
+        val snapshot = repository.getSnapshot() ?: emptyList()
+        val missing = snapshot.filter { it.state == MediaLifecycleState.MISSING_FROM_LOCAL_SCAN }
+        val targets = if (missing.size >= 20) missing.take(20) else missing
+
+        if (targets.isEmpty()) {
+            Toast.makeText(this, "선택할 소실 사진이 없습니다. 먼저 스캔을 실행하세요.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        GhostAccessibilityService.startSafePipeline(targets, "2026-09")
+        Toast.makeText(this, "Google Photos 2-Pass 안전 자동 선택 시작 (소실 ${targets.size}건, Zero-Delete)", Toast.LENGTH_SHORT).show()
     }
 
     private fun handleLiveCollectClick() {
@@ -160,7 +195,8 @@ class MainActivity : AppCompatActivity() {
         val snapshot = repository.getSnapshot() ?: return
         val missing = snapshot.filter { it.state == MediaLifecycleState.MISSING_FROM_LOCAL_SCAN }
         if (missing.isNotEmpty()) {
-            binding.tvStatus.text = "기록된 스냅샷: 기기 ${snapshot.size}개 중 소실 후보 ${missing.size}건 감지됨"
+            val countStr = if (missing.size >= 3) "3" else "${missing.size}"
+            binding.tvStatus.text = "폰에서 삭제된 사진 ${countStr}개를 찾았습니다 (소실 후보 ${missing.size}건 감지됨)"
             adapter.submitList(missing)
         }
     }

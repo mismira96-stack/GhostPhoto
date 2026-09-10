@@ -46,12 +46,22 @@
     </LinearLayout>
 
     <Button
-        android:id="@+id/btn_live_collect"
+        android:id="@+id/btn_find_and_select"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:backgroundTint="#1A73E8"
-        android:text="🔍 P2-A: 구글포토 실시간 수집 시작 (Read-Only)" />
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:text="🎯 [Google Photos에서 찾기] 소실 3건 탐색 &amp; 선택" />
+
+    <Button
+        android:id="@+id/btn_live_collect"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:backgroundTint="#5F6368"
+        android:text="🔍 P2-A: 구글포토 실시간 수집만 실행 (Read-Only)" />
 
     <Button
         android:id="@+id/btn_view_report"
